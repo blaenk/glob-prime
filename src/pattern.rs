@@ -100,7 +100,7 @@ impl Pattern {
                           "a single path component, e.g. a/**/b").to_string(),
                         });
                 }
-                // `**~ begins with non-separator
+                // `**` begins with non-separator
               } else {
                 return Err(
                   Error  {
