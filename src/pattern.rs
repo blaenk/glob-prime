@@ -45,7 +45,7 @@ impl fmt::Show for Error {
 
 impl Pattern {
   pub fn new(pattern: &str) -> Result<Pattern, Error> {
-    Pattern::parse(pattern).and_then(|tokens| Pattern::compile(tokens))
+    Pattern::parse(pattern).and_then(Pattern::compile)
   }
 
   fn parse(pattern: &str) -> Result<Vec<Token>, Error> {
@@ -238,9 +238,7 @@ impl Pattern {
 
     re.push_str(r"\z(?ms)");
 
-    let compiled = Regex::new(re.as_slice());
-
-    compiled
+    Regex::new(re.as_slice())
       .map(|r| Pattern { re: r })
       .map_err(|e| Error { pos: e.pos, msg: e.msg })
   }
