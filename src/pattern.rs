@@ -183,7 +183,13 @@ impl Pattern {
   fn emit_set(pattern: &mut String, specs: &Vec<CharSpecifier>) {
     for &spec in specs.iter() {
       match spec {
-        SingleChar(c) => pattern.push(c),
+        SingleChar(c) => {
+          if c == '\\' {
+            pattern.push_str(r"\\");
+          } else {
+            pattern.push(c)
+          }
+        },
         CharRange(a, b) =>
           pattern.push_str(
             format!("{start}-{end}", start = a, end = b).as_slice()),
@@ -290,10 +296,11 @@ mod test {
     assert!(pat.re.is_match("cache/!/files"));
     assert!(!pat.re.is_match("cache/a/files"));
 
-    let pat = Pattern::new(r"cache/[[?*]/files").unwrap();
+    let pat = Pattern::new(r"cache/[[?*\]/files").unwrap();
     assert!(pat.re.is_match("cache/[/files"));
     assert!(pat.re.is_match("cache/?/files"));
     assert!(pat.re.is_match("cache/*/files"));
+    assert!(pat.re.is_match(r"cache/\/files"));
   }
 
   #[test]
