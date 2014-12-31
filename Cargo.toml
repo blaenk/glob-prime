@@ -1,0 +1,5 @@
+[package]
+
+name = "glob-prime"
+version = "0.0.1"
+authors = ["Jorge Israel Peña <jorge.israel.p@gmail.com>"]
