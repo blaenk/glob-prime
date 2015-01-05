@@ -1,11 +1,10 @@
-use pattern::{Pattern, Error};
-use self::Selector::{Terminating, Precise, Wildcard, Recursive};
-
-use std::io::fs::{Directories, walk_dir};
 use std::iter::Peekable;
 
 use std::io::fs::PathExtensions;
 use std::io::fs::readdir;
+
+use pattern::{Pattern, Error};
+use self::Selector::{Terminating, Precise, Wildcard, Recursive};
 
 enum Selector {
   Precise {
@@ -111,6 +110,7 @@ impl Selector {
             return Some(entry);
           }
 
+          // TODO: clone
           let current = entry.clone();
           match successor.select_from(entry) {
             None => continue 'outer,
@@ -125,6 +125,7 @@ impl Selector {
         return None;
       },
 
+      // TODO: currently doesn't consider cur-dir
       Recursive {
         successor: box ref mut successor,
         ref mut directories,
@@ -142,13 +143,14 @@ impl Selector {
             return None;
           }
 
+          // TODO: clone
           let current = dirs.peek().unwrap().clone();
 
           // TODO:
           // this is returning only the directories,
           // like python, ruby, and zsh seems to do
           if let &Terminating = successor {
-            let path = dirs.find(|p| p.is_dir() );
+            let path = dirs.next();
             *directories = Some(dirs);
             return path;
           }
@@ -169,6 +171,38 @@ impl Selector {
       Terminating => Some(path),
     }
   }
+}
+
+struct Directories {
+  stack: Vec<Path>,
+}
+
+impl Iterator for Directories {
+  type Item = Path;
+
+  fn next(&mut self) -> Option<Path> {
+    match self.stack.pop() {
+      Some(path) => {
+        if path.is_dir() {
+          match readdir(&path) {
+            Ok(dirs) => {
+              self.stack.extend(dirs.into_iter().filter(|p| p.is_dir()));
+            }
+            Err(..) => {}
+          }
+        }
+        Some(path)
+      }
+      None => None
+    }
+  }
+}
+
+fn walk_dir(path: &Path) -> ::std::io::IoResult<Directories> {
+  let mut dirs = try!(readdir(path));
+  dirs.retain(|p| p.is_dir());
+
+  Ok(Directories { stack: dirs })
 }
 
 pub struct Paths {
