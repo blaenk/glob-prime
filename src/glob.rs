@@ -112,16 +112,14 @@ impl Selector {
           }
 
           else {
-            loop {
-              let current = entry.clone();
-              match successor.select_from(entry) {
-                None => continue 'outer,
-                matched => {
-                  ents.push(current);
-                  *entries = Some(ents);
-                  return matched;
-                },
-              }
+            let current = entry.clone();
+            match successor.select_from(entry) {
+              None => continue 'outer,
+              matched => {
+                ents.push(current);
+                *entries = Some(ents);
+                return matched;
+              },
             }
           }
         }
@@ -216,6 +214,10 @@ mod test {
   #[test]
   fn wildcards() {
     for (i, f) in glob("tests/fixtures/**/*.txt").unwrap().enumerate() {
+      println!("-> {}. {}", i, f.display());
+    }
+
+    for (i, f) in glob("s*rc/*.rs").unwrap().enumerate() {
       println!("-> {}. {}", i, f.display());
     }
   }
