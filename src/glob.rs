@@ -4,6 +4,9 @@ use self::Selector::{Terminating, Precise, Wildcard, Recursive};
 use std::io::fs::{Directories, walk_dir};
 use std::iter::Peekable;
 
+use std::io::fs::PathExtensions;
+use std::io::fs::readdir;
+
 enum Selector {
   Precise {
     pattern: String,
@@ -73,9 +76,6 @@ impl Selector {
   }
 
   fn select_from(&mut self, path: Path) -> Option<Path> {
-    use std::io::fs::PathExtensions;
-    use std::io::fs::readdir;
-
     match *self {
       Precise { pattern: ref pat, successor: box ref mut succ } => {
         let joined = path.join(pat);
@@ -111,16 +111,14 @@ impl Selector {
             return Some(entry);
           }
 
-          else {
-            let current = entry.clone();
-            match successor.select_from(entry) {
-              None => continue 'outer,
-              matched => {
-                ents.push(current);
-                *entries = Some(ents);
-                return matched;
-              },
-            }
+          let current = entry.clone();
+          match successor.select_from(entry) {
+            None => continue 'outer,
+            matched => {
+              ents.push(current);
+              *entries = Some(ents);
+              return matched;
+            },
           }
         }
 
@@ -145,6 +143,15 @@ impl Selector {
           }
 
           let current = dirs.peek().unwrap().clone();
+
+          // TODO:
+          // this is returning only the directories,
+          // like python, ruby, and zsh seems to do
+          if let &Terminating = successor {
+            let path = dirs.find(|p| p.is_dir() );
+            *directories = Some(dirs);
+            return path;
+          }
 
           match successor.select_from(current) {
             None => {
@@ -218,6 +225,10 @@ mod test {
     }
 
     for (i, f) in glob("s*rc/*.rs").unwrap().enumerate() {
+      println!("-> {}. {}", i, f.display());
+    }
+
+    for (i, f) in glob("target/**").unwrap().enumerate() {
       println!("-> {}. {}", i, f.display());
     }
   }
