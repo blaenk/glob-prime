@@ -11,7 +11,7 @@ use self::Token::{
 };
 use self::CharSpecifier::{SingleChar, CharRange};
 
-#[deriving(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Show)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Show)]
 enum Token {
   Char(char),
   AnyChar,
@@ -21,7 +21,7 @@ enum Token {
   AnyExcept(Vec<CharSpecifier>)
 }
 
-#[deriving(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Show)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Show)]
 enum CharSpecifier {
   SingleChar(char),
   CharRange(char, char)
@@ -46,6 +46,16 @@ impl fmt::Show for Error {
 impl Pattern {
   pub fn new(pattern: &str) -> Result<Pattern, Error> {
     Pattern::parse(pattern).and_then(Pattern::compile)
+  }
+
+  pub fn matches(&self, str: &str) -> bool {
+    self.re.is_match(str)
+  }
+
+  pub fn matches_path(&self, path: &Path) -> bool {
+    path.as_str().map_or(false, |s| {
+      self.matches(s)
+    })
   }
 
   fn parse(pattern: &str) -> Result<Vec<Token>, Error> {
@@ -150,8 +160,10 @@ impl Pattern {
           }
 
           // if we get here then this is not a valid range pattern
-          tokens.push(Char('['));
-          i += 1;
+          return Err(
+            Error  {
+              pos: i,
+              msg: "invalid range pattern".to_string()});
         }
         c => {
           tokens.push(Char(c));
@@ -247,6 +259,12 @@ impl Pattern {
 impl fmt::Show for Pattern {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "{}", self.re)
+  }
+}
+
+impl PartialEq for Pattern {
+  fn eq(&self, other: &Pattern) -> bool {
+    self.to_string() == other.to_string()
   }
 }
 

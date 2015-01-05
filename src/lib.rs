@@ -1,4 +1,6 @@
 #![feature(phase)]
+#![feature(globs)]
+#![feature(associated_types)]
 
 extern crate regex;
 
@@ -6,3 +8,4 @@ extern crate regex;
 extern crate regex_macros;
 
 pub mod pattern;
+pub mod glob;
