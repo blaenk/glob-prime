@@ -24,7 +24,9 @@ enum Selector {
     // book keeping
     directories: Option<Peekable<Path, Directories>>,
   },
-  Terminating,
+  Terminating {
+    terminated: bool,
+  },
 }
 
 static WILDCARD: ::regex::Regex = regex!(r"[[*?]");
@@ -67,20 +69,33 @@ impl Selector {
           });
         }
       } else {
-        return Ok(Terminating);
+          return Ok(Terminating {
+            terminated: false,
+          });
       }
     }
 
     return build_selector(patterns.as_slice());
   }
 
-  fn select_from(&mut self, path: Path) -> Option<Path> {
+  fn is_terminating(&self) -> bool {
+    if let Terminating {..} = *self {
+      true
+    } else {
+      false
+    }
+  }
+
+  fn select_from(&mut self, path: &Path) -> Option<Path> {
     match *self {
-      Precise { pattern: ref pat, successor: box ref mut succ } => {
-        let joined = path.join(pat);
+      Precise {
+        ref pattern,
+        successor: box ref mut successor
+      } => {
+        let joined = path.join(pattern);
 
         if path.is_dir() && joined.exists() {
-          return succ.select_from(joined);
+          return successor.select_from(&joined);
         } else {
           return None;
         }
@@ -96,7 +111,7 @@ impl Selector {
         }
 
         let mut ents =
-          entries.take().unwrap_or_else(|| readdir(&path).unwrap());
+          entries.take().unwrap_or_else(|| readdir(path).unwrap());
 
         'outer: while let Some(entry) = ents.pop() {
           if !pattern.matches_path(&entry) {
@@ -105,17 +120,15 @@ impl Selector {
 
           // this is necessary, otherwise the successor.select_from
           // would keep yielding Some(x) if the successor is Terminating
-          if let &Terminating = successor {
+          if successor.is_terminating() {
             *entries = Some(ents);
             return Some(entry);
           }
 
-          // TODO: clone
-          let current = entry.clone();
-          match successor.select_from(entry) {
+          match successor.select_from(&entry) {
             None => continue 'outer,
             matched => {
-              ents.push(current);
+              ents.push(entry);
               *entries = Some(ents);
               return matched;
             },
@@ -136,26 +149,23 @@ impl Selector {
 
         let mut dirs =
           directories.take()
-            .unwrap_or_else(|| walk_dir(&path).unwrap().peekable());
+            .unwrap_or_else(|| walk_dir(path).unwrap().peekable());
 
         loop {
           if !dirs.peek().is_some() {
             return None;
           }
 
-          // TODO: clone
-          let current = dirs.peek().unwrap().clone();
-
           // TODO:
           // this is returning only the directories,
           // like python, ruby, and zsh seems to do
-          if let &Terminating = successor {
+          if successor.is_terminating() {
             let path = dirs.next();
             *directories = Some(dirs);
             return path;
           }
 
-          match successor.select_from(current) {
+          match successor.select_from(dirs.peek().unwrap()) {
             None => {
               dirs.next();
               continue;
@@ -168,7 +178,25 @@ impl Selector {
         }
       },
 
-      Terminating => Some(path),
+      // this is only used in the case of a Precise selector
+      // followed by a Terminating selector. In this case,
+      // the Precise selector would delegate to the Terminating
+      // selector, which would continuously return Some(path)
+      //
+      // The `terminated` flag is used to prevent this, working
+      // like a kind of semaphore which ensures that it returns
+      // a given path once.
+      Terminating {
+        ref mut terminated,
+      } => {
+        if *terminated {
+          *terminated = false;
+          return None;
+        } else {
+          *terminated = true;
+          return Some(path.clone());
+        }
+      },
     }
   }
 }
@@ -206,20 +234,28 @@ fn walk_dir(path: &Path) -> ::std::io::IoResult<Directories> {
 }
 
 pub struct Paths {
+  scope: Path,
   selector: Selector,
 }
 
 pub fn glob(pattern: &str) -> Result<Paths, Error> {
   let selector = try!(Selector::from_pattern(pattern));
+  let scope =
+    Path::new(pattern)
+      .root_path()
+      .unwrap_or_else(|| Path::new("."));
 
-  Ok(Paths { selector: selector })
+  Ok(Paths {
+    scope: scope,
+    selector: selector,
+  })
 }
 
 impl Iterator for Paths {
   type Item = Path;
 
   fn next(&mut self) -> Option<Path> {
-    return self.selector.select_from(Path::new("."));
+    return self.selector.select_from(&self.scope);
   }
 }
 
@@ -254,15 +290,28 @@ mod test {
 
   #[test]
   fn wildcards() {
+    // recursive and wildcard
     for (i, f) in glob("tests/fixtures/**/*.txt").unwrap().enumerate() {
       println!("-> {}. {}", i, f.display());
     }
 
+    // wildcards
     for (i, f) in glob("s*rc/*.rs").unwrap().enumerate() {
       println!("-> {}. {}", i, f.display());
     }
 
+    // end in recursive
     for (i, f) in glob("target/**").unwrap().enumerate() {
+      println!("-> {}. {}", i, f.display());
+    }
+
+    // absolute path
+    for (i, f) in glob("/l*").unwrap().enumerate() {
+      println!("-> {}. {}", i, f.display());
+    }
+
+    // single file
+    for (i, f) in glob("readme.md").unwrap().enumerate() {
       println!("-> {}. {}", i, f.display());
     }
   }
