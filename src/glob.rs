@@ -329,8 +329,20 @@ mod test {
       println!("-> {}. {}", i, f.display());
     }
 
+    // the next three should be equivalent
+
     // end in recursive
     for (i, f) in glob("target/**").unwrap().enumerate() {
+      println!("-> {}. {}", i, f.display());
+    }
+
+    // `..` end in recursive
+    for (i, f) in glob("target/../target/**").unwrap().enumerate() {
+      println!("-> {}. {}", i, f.display());
+    }
+
+    // a mess
+    for (i, f) in glob("./target/./../target/**").unwrap().enumerate() {
       println!("-> {}. {}", i, f.display());
     }
 

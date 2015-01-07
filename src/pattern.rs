@@ -58,6 +58,25 @@ impl Pattern {
     })
   }
 
+  pub fn escape(s: &str) -> String {
+    let mut escaped = String::new();
+
+    for c in s.chars() {
+      match c {
+        '?' | '*' | '[' | ']' => {
+          escaped.push('[');
+          escaped.push(c);
+          escaped.push(']');
+        }
+        c => {
+          escaped.push(c);
+        }
+      }
+    }
+
+    return escaped;
+  }
+
   fn parse(pattern: &str) -> Result<Vec<Token>, Error> {
     let chars = pattern.chars().collect::<Vec<_>>();
     let mut tokens = Vec::new();
@@ -335,5 +354,18 @@ mod test {
     assert!(pat.re.is_match("cache/]/files"));
     assert!(pat.re.is_match("cache/-/files"));
     assert!(!pat.re.is_match("cache/0/files"));
+  }
+
+  #[test]
+  fn escape() {
+    assert_eq!(
+      Pattern::escape("one/?/two/*/three/[/four/]/end"),
+      "one/[?]/two/[*]/three/[[]/four/[]]/end".to_string()
+    );
+
+    assert_eq!(
+      Pattern::escape("one/?*[]"),
+      "one/[?][*][[][]]".to_string()
+    );
   }
 }
