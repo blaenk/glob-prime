@@ -3,6 +3,8 @@ use std::iter::Peekable;
 use std::io::fs::PathExtensions;
 use std::io::fs::readdir;
 
+use std::cmp::min;
+
 use pattern::{Pattern, Error};
 use self::Selector::{Terminating, Precise, Wildcard, Recursive};
 
@@ -239,11 +241,38 @@ pub struct Paths {
 }
 
 pub fn glob(pattern: &str) -> Result<Paths, Error> {
-  let selector = try!(Selector::from_pattern(pattern));
+  #[cfg(windows)]
+  fn check_windows_verbatim(p: &Path) -> bool { path::windows::is_verbatim(p) }
+  #[cfg(not(windows))]
+  fn check_windows_verbatim(_: &Path) -> bool { false }
+
+  #[cfg(windows)]
+  fn handle_volume_relative(p: Path) -> Path {
+    use std::os::getcwd;
+
+    if path::windows::is_vol_relative(&p) {
+      getcwd().unwrap().push(p);
+    } else {
+      p
+    }
+  }
+  #[cfg(not(windows))]
+  fn handle_volume_relative(p: Path) -> Path { p }
+
+  let root = Path::new(pattern).root_path();
+  let root_len = root.as_ref().map_or(0u, |p| p.as_vec().len());
+
+  if root.is_some() && check_windows_verbatim(root.as_ref().unwrap()) {
+    panic!("FIXME: verbatim");
+  }
+
   let scope =
-    Path::new(pattern)
-      .root_path()
+    root
+      .map(handle_volume_relative)
       .unwrap_or_else(|| Path::new("."));
+
+  let trimmed = pattern.slice_from(min(root_len, pattern.len()));
+  let selector = try!(Selector::from_pattern(trimmed));
 
   Ok(Paths {
     scope: scope,
