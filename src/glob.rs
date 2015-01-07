@@ -43,41 +43,41 @@ impl Selector {
       pattern.split_terminator(::std::path::SEP)
         .collect::<Vec<&str>>();
 
-    fn build_selector(patterns: &[&str]) -> Result<Selector, Error> {
-      if !patterns.is_empty() {
-        let pattern = patterns[0];
-        let rest = patterns.slice_from(1);
+    return Selector::from_components(patterns.as_slice());
+  }
 
-        if pattern == "**" {
-          return Ok(Recursive {
-            successor: box try!(build_selector(rest)),
-            directories: None,
-          });
-        }
+  fn from_components(patterns: &[&str]) -> Result<Selector, Error> {
+    if !patterns.is_empty() {
+      let pattern = patterns[0];
+      let rest = patterns.slice_from(1);
 
-        else if WILDCARD.is_match(pattern) {
-          let compiled = try!(Pattern::new(pattern));
-          return Ok(Wildcard {
-            pattern: compiled,
-            successor: box try!(build_selector(rest)),
-            entries: None,
-          });
-        }
-
-        else {
-          return Ok(Precise {
-            pattern: pattern.to_string(),
-            successor: box try!(build_selector(rest)),
-          });
-        }
-      } else {
-          return Ok(Terminating {
-            terminated: false,
-          });
+      if pattern == "**" {
+        return Ok(Recursive {
+          successor: box try!(Selector::from_components(rest)),
+          directories: None,
+        });
       }
-    }
 
-    return build_selector(patterns.as_slice());
+      else if WILDCARD.is_match(pattern) {
+        let compiled = try!(Pattern::new(pattern));
+        return Ok(Wildcard {
+          pattern: compiled,
+          successor: box try!(Selector::from_components(rest)),
+          entries: None,
+        });
+      }
+
+      else {
+        return Ok(Precise {
+          pattern: pattern.to_string(),
+          successor: box try!(Selector::from_components(rest)),
+        });
+      }
+    } else {
+        return Ok(Terminating {
+          terminated: false,
+        });
+    }
   }
 
   fn is_terminating(&self) -> bool {
