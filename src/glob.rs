@@ -213,14 +213,13 @@ impl Iterator for Directories {
   fn next(&mut self) -> Option<Path> {
     match self.stack.pop() {
       Some(path) => {
-        if path.is_dir() {
-          match readdir(&path) {
-            Ok(dirs) => {
-              self.stack.extend(dirs.into_iter().filter(|p| p.is_dir()));
-            }
-            Err(..) => {}
+        match readdir(&path) {
+          Ok(dirs) => {
+            self.stack.extend(dirs.into_iter().filter(|p| p.is_dir()));
           }
+          Err(..) => {}
         }
+
         Some(path)
       }
       None => None
@@ -229,10 +228,7 @@ impl Iterator for Directories {
 }
 
 fn walk_dir(path: &Path) -> ::std::io::IoResult<Directories> {
-  let mut dirs = try!(readdir(path));
-  dirs.retain(|p| p.is_dir());
-
-  Ok(Directories { stack: dirs })
+  Ok(Directories { stack: vec![path.clone()] })
 }
 
 pub struct Paths {
