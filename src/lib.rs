@@ -1,10 +1,8 @@
-#![feature(phase)]
-#![feature(globs)]
-#![feature(associated_types)]
+#![feature(plugin)]
 
 extern crate regex;
 
-#[phase(plugin, link)]
+#[plugin]
 extern crate regex_macros;
 
 pub mod pattern;
