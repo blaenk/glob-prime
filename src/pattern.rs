@@ -27,8 +27,10 @@ enum CharSpecifier {
   CharRange(char, char)
 }
 
+// TODO: add original string here?
 pub struct Pattern {
   re: Regex,
+  original: String,
 }
 
 pub struct Error {
@@ -46,6 +48,11 @@ impl fmt::Show for Error {
 impl Pattern {
   pub fn new(pattern: &str) -> Result<Pattern, Error> {
     Pattern::parse(pattern).and_then(Pattern::compile)
+      .map(|r| Pattern { original: pattern.to_string(), re: r })
+  }
+
+  pub fn as_str<'a>(&'a self) -> &'a str {
+    self.original.as_slice()
   }
 
   pub fn matches(&self, str: &str) -> bool {
@@ -242,7 +249,7 @@ impl Pattern {
     return escaped;
   }
 
-  fn compile(tokens: Vec<Token>) -> Result<Pattern, Error> {
+  fn compile(tokens: Vec<Token>) -> Result<Regex, Error> {
     let mut re = String::new();
 
     for token in tokens.iter() {
@@ -270,7 +277,6 @@ impl Pattern {
     re.push_str(r"\z(?ms)");
 
     Regex::new(re.as_slice())
-      .map(|r| Pattern { re: r })
       .map_err(|e| Error { pos: e.pos, msg: e.msg })
   }
 }

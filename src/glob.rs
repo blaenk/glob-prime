@@ -39,6 +39,7 @@ impl Selector {
   fn from_pattern(pattern: &str) -> Result<Selector, Error> {
     // compile pattern to make sure there are no immediate errors
     let _compiled = try!(Pattern::new(pattern));
+    // TODO: should this be split on r"[^\]{SEP}"
     let patterns =
       pattern.split_terminator(::std::path::SEP)
         .collect::<Vec<&str>>();
