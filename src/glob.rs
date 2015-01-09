@@ -3,6 +3,8 @@ use std::iter::Peekable;
 use std::io::fs::PathExtensions;
 use std::io::fs::readdir;
 
+use std::path::is_sep;
+
 use std::cmp::min;
 
 use pattern::{Pattern, Error};
@@ -40,9 +42,24 @@ impl Selector {
     // compile pattern to make sure there are no immediate errors
     let _compiled = try!(Pattern::new(pattern));
     // TODO: should this be split on r"[^\]{SEP}"
-    let patterns =
-      pattern.split_terminator(::std::path::SEP)
-        .collect::<Vec<&str>>();
+
+    let mut patterns: Vec<&str> = Vec::new();
+    let mut was_recursive = false;
+
+    // collapse consecutive recursive patterns
+    for pattern in pattern.split(is_sep) {
+      if pattern == "**" {
+        if was_recursive {
+          continue;
+        } else {
+          was_recursive = true;
+        }
+      } else {
+        was_recursive = false;
+      }
+
+      patterns.push(pattern);
+    }
 
     return Selector::from_components(patterns.as_slice());
   }
@@ -89,7 +106,7 @@ impl Selector {
     }
   }
 
-  fn select_from(&mut self, path: &Path) -> Option<Path> {
+  fn select_from(&mut self, path: &Path, is_dir: bool) -> Option<Path> {
     match *self {
       Precise {
         ref pattern,
@@ -98,7 +115,7 @@ impl Selector {
         let joined = path.join(pattern);
 
         if path.is_dir() && joined.exists() {
-          return successor.select_from(&joined);
+          return successor.select_from(&joined, is_dir);
         } else {
           return None;
         }
@@ -124,11 +141,15 @@ impl Selector {
           // this is necessary, otherwise the successor.select_from
           // would keep yielding Some(x) if the successor is Terminating
           if successor.is_terminating() {
+            if is_dir && !entry.is_dir() {
+              return None;
+            }
+
             *entries = Some(ents);
             return Some(entry);
           }
 
-          match successor.select_from(&entry) {
+          match successor.select_from(&entry, is_dir) {
             None => continue 'outer,
             matched => {
               ents.push(entry);
@@ -168,7 +189,7 @@ impl Selector {
             return path;
           }
 
-          match successor.select_from(dirs.peek().unwrap()) {
+          match successor.select_from(dirs.peek().unwrap(), is_dir) {
             None => {
               dirs.next();
               continue;
@@ -197,7 +218,12 @@ impl Selector {
           return None;
         } else {
           *terminated = true;
-          return Some(path.clone());
+
+          if !is_dir || (is_dir && path.is_dir()) {
+            return Some(path.clone());
+          } else {
+            return None;
+          }
         }
       },
     }
@@ -235,6 +261,7 @@ fn walk_dir(path: &Path) -> ::std::io::IoResult<Directories> {
 pub struct Paths {
   scope: Path,
   selector: Selector,
+  is_dir: bool,
 }
 
 pub fn glob(pattern: &str) -> Result<Paths, Error> {
@@ -270,10 +297,12 @@ pub fn glob(pattern: &str) -> Result<Paths, Error> {
 
   let trimmed = pattern.slice_from(min(root_len, pattern.len()));
   let selector = try!(Selector::from_pattern(trimmed));
+  let is_dir = pattern.chars().next_back().map(is_sep) == Some(true);
 
   Ok(Paths {
     scope: scope,
     selector: selector,
+    is_dir: is_dir,
   })
 }
 
@@ -281,15 +310,13 @@ impl Iterator for Paths {
   type Item = Path;
 
   fn next(&mut self) -> Option<Path> {
-    return self.selector.select_from(&self.scope);
+    return self.selector.select_from(&self.scope, self.is_dir);
   }
 }
 
 #[cfg(test)]
 mod test {
-  use pattern::Pattern;
-  use super::{Selector, glob};
-  use super::Selector::*;
+  use super::glob;
 
   // #[test]
   // fn selectors() {

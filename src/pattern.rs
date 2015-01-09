@@ -1,5 +1,6 @@
 use regex::Regex;
 use std::fmt;
+use std::path;
 
 use self::Token::{
   Char,
@@ -259,7 +260,7 @@ impl Pattern {
         AnySequence =>
           re.push_str(
             format!(r"[^{sep}]*",
-                    sep = Pattern::escape_regex_char(::std::path::SEP).as_slice()).as_slice()),
+                    sep = Pattern::escape_regex_char(path::SEP).as_slice()).as_slice()),
         AnyRecursiveSequence => re.push_str(".*"),
         AnyWithin(ref specs) => {
           re.push('[');
@@ -296,6 +297,13 @@ impl PartialEq for Pattern {
 #[cfg(test)]
 mod test {
   use super::Pattern;
+
+  #[test]
+  fn match_dir() {
+    let pat = Pattern::new("some/file.txt/").unwrap();
+    assert!(pat.matches("some/file.txt/"));
+    assert!(!pat.matches("some/file.txt"));
+  }
 
   #[test]
   fn translation() {
