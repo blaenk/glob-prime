@@ -315,42 +315,21 @@ mod test {
   // }
 
   #[test]
-  fn wildcards() {
-    // recursive and wildcard
-    for (i, f) in glob("tests/fixtures/**/*.txt").unwrap().enumerate() {
-      println!("-> {}. {}", i, f.display());
-    }
+  fn absolute_pattern() {
+    // assume that the filesystem is not empty!
+    assert!(glob("/*").unwrap().next().is_some());
+    assert!(glob("//").unwrap().next().is_some());
 
-    // wildcards
-    for (i, f) in glob("s*rc/*.rs").unwrap().enumerate() {
-      println!("-> {}. {}", i, f.display());
-    }
+    // check windows absolute paths with host/device components
+    let root_with_device = ::std::os::getcwd().unwrap().root_path().unwrap().join("*");
+    // FIXME (#9639): This needs to handle non-utf8 paths
+    assert!(glob(root_with_device.as_str().unwrap()).unwrap().next().is_some());
+  }
 
-    // the next three should be equivalent
-
-    // end in recursive
-    for (i, f) in glob("target/**").unwrap().enumerate() {
-      println!("-> {}. {}", i, f.display());
-    }
-
-    // `..` end in recursive
-    for (i, f) in glob("target/../target/**").unwrap().enumerate() {
-      println!("-> {}. {}", i, f.display());
-    }
-
-    // a mess
-    for (i, f) in glob("./target/./../target/**").unwrap().enumerate() {
-      println!("-> {}. {}", i, f.display());
-    }
-
-    // absolute path
-    for (i, f) in glob("/l*").unwrap().enumerate() {
-      println!("-> {}. {}", i, f.display());
-    }
-
-    // single file
-    for (i, f) in glob("readme.md").unwrap().enumerate() {
-      println!("-> {}. {}", i, f.display());
-    }
+  #[test]
+  fn lots_of_files() {
+    // TODO: this comes up with a perm denied file
+    // this is a good test because it touches lots of differently named files
+    // glob("/*/*/*/*").unwrap().skip(10000).next();
   }
 }

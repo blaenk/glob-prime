@@ -374,4 +374,142 @@ mod test {
       "one/[?][*][[][]]".to_string()
     );
   }
+
+  #[test]
+  fn wildcards_two() {
+    assert!(Pattern::new("a*b").unwrap().matches("a_b"));
+    assert!(Pattern::new("a*b*c").unwrap().matches("abc"));
+    assert!(!Pattern::new("a*b*c").unwrap().matches("abcd"));
+    assert!(Pattern::new("a*b*c").unwrap().matches("a_b_c"));
+    assert!(Pattern::new("a*b*c").unwrap().matches("a___b___c"));
+    assert!(Pattern::new("abc*abc*abc").unwrap().matches("abcabcabcabcabcabcabc"));
+    assert!(!Pattern::new("abc*abc*abc").unwrap().matches("abcabcabcabcabcabcabca"));
+    assert!(Pattern::new("a*a*a*a*a*a*a*a*a").unwrap().matches("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+    assert!(Pattern::new("a*b[xyz]c*d").unwrap().matches("abxcdbxcddd"));
+  }
+
+  #[test]
+  fn recursive_wildcards() {
+    let pat = Pattern::new("some/**/needle.txt").unwrap();
+    assert!(pat.matches("some/needle.txt"));
+    assert!(pat.matches("some/one/needle.txt"));
+    assert!(pat.matches("some/one/two/needle.txt"));
+    assert!(pat.matches("some/other/needle.txt"));
+    assert!(!pat.matches("some/other/notthis.txt"));
+
+    // a single ** should be valid, for globs
+    Pattern::new("**").unwrap();
+
+    // collapse consecutive wildcards
+    let pat = Pattern::new("some/**/**/needle.txt").unwrap();
+    assert!(pat.matches("some/needle.txt"));
+    assert!(pat.matches("some/one/needle.txt"));
+    assert!(pat.matches("some/one/two/needle.txt"));
+    assert!(pat.matches("some/other/needle.txt"));
+    assert!(!pat.matches("some/other/notthis.txt"));
+
+    // ** can begin the pattern
+    let pat = Pattern::new("**/test").unwrap();
+    assert!(pat.matches("one/two/test"));
+    assert!(pat.matches("one/test"));
+    assert!(pat.matches("test"));
+
+    // /** can begin the pattern
+    let pat = Pattern::new("/**/test").unwrap();
+    assert!(pat.matches("/one/two/test"));
+    assert!(pat.matches("/one/test"));
+    assert!(pat.matches("/test"));
+    assert!(!pat.matches("/one/notthis"));
+    assert!(!pat.matches("/notthis"));
+  }
+
+  #[test]
+  fn range_pattern() {
+
+    let pat = Pattern::new("a[0-9]b").unwrap();
+    for i in range(0u, 10) {
+      assert!(pat.matches(format!("a{}b", i).as_slice()));
+    }
+    assert!(!pat.matches("a_b"));
+
+    let pat = Pattern::new("a[!0-9]b").unwrap();
+    for i in range(0u, 10) {
+      assert!(!pat.matches(format!("a{}b", i).as_slice()));
+    }
+    assert!(pat.matches("a_b"));
+
+    let pats = ["[a-z123]", "[1a-z23]", "[123a-z]"];
+    for &p in pats.iter() {
+      let pat = Pattern::new(p).unwrap();
+      for c in "abcdefghijklmnopqrstuvwxyz".chars() {
+        assert!(pat.matches(c.to_string().as_slice()));
+      }
+      assert!(pat.matches("1"));
+      assert!(pat.matches("2"));
+      assert!(pat.matches("3"));
+    }
+
+    let pats = ["[abc-]", "[-abc]", "[a-c-]"];
+    for &p in pats.iter() {
+      let pat = Pattern::new(p).unwrap();
+      assert!(pat.matches("a"));
+      assert!(pat.matches("b"));
+      assert!(pat.matches("c"));
+      assert!(pat.matches("-"));
+      assert!(!pat.matches("d"));
+    }
+
+    let pat = Pattern::new("[!1-2]").unwrap();
+    assert!(!pat.matches("1"));
+    assert!(!pat.matches("2"));
+
+    assert!(Pattern::new("[-]").unwrap().matches("-"));
+    assert!(!Pattern::new("[!-]").unwrap().matches("-"));
+  }
+
+  #[test]
+  fn unclosed_bracket() {
+    // TODO: assert error position
+    // unclosed `[` should be treated literally
+    assert!(Pattern::new("abc[def").is_err());
+    assert!(Pattern::new("abc[!def").is_err());
+    assert!(Pattern::new("abc[").is_err());
+    assert!(Pattern::new("abc[!").is_err());
+    assert!(Pattern::new("abc[d").is_err());
+    assert!(Pattern::new("abc[!d").is_err());
+    assert!(Pattern::new("abc[]").is_err());
+    assert!(Pattern::new("abc[!]").is_err());
+  }
+
+  #[test]
+  fn pattern_matches() {
+    let txt_pat = Pattern::new("*hello.txt").unwrap();
+    assert!(txt_pat.matches("hello.txt"));
+    assert!(txt_pat.matches("gareth_says_hello.txt"));
+    assert!(txt_pat.matches("some/path/to/hello.txt"));
+    assert!(txt_pat.matches("some\\path\\to\\hello.txt"));
+    assert!(txt_pat.matches("/an/absolute/path/to/hello.txt"));
+    assert!(!txt_pat.matches("hello.txt-and-then-some"));
+    assert!(!txt_pat.matches("goodbye.txt"));
+
+    let dir_pat = Pattern::new("*some/path/to/hello.txt").unwrap();
+    assert!(dir_pat.matches("some/path/to/hello.txt"));
+    assert!(dir_pat.matches("a/bigger/some/path/to/hello.txt"));
+    assert!(!dir_pat.matches("some/path/to/hello.txt-and-then-some"));
+    assert!(!dir_pat.matches("some/other/path/to/hello.txt"));
+  }
+
+  #[test]
+  fn pattern_escape() {
+    let s = "_[_]_?_*_!_";
+    assert_eq!(Pattern::escape(s), "_[[]_[]]_[?]_[*]_!_".to_string());
+    assert!(Pattern::new(Pattern::escape(s).as_slice()).unwrap().matches(s));
+  }
+
+  #[test]
+  fn matches_path() {
+    // on windows, (Path::new("a/b").as_str().unwrap() == "a\\b"), so this
+    // tests that / and \ are considered equivalent on windows
+    assert!(Pattern::new("a/b").unwrap().matches_path(&Path::new("a/b")));
+  }
 }
