@@ -35,7 +35,7 @@ pub struct Pattern {
 }
 
 pub struct Error {
-  pub pos: uint,
+  pub pos: usize,
   pub msg: String,
 }
 
@@ -283,6 +283,12 @@ impl Pattern {
 }
 
 impl fmt::Show for Pattern {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{}", self.re)
+  }
+}
+
+impl fmt::String for Pattern {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "{}", self.re)
   }

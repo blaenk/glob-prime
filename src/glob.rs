@@ -71,7 +71,7 @@ impl Selector {
 
       if pattern == "**" {
         return Ok(Recursive {
-          successor: box try!(Selector::from_components(rest)),
+          successor: Box::new(try!(Selector::from_components(rest))),
           directories: None,
         });
       }
@@ -80,7 +80,7 @@ impl Selector {
         let compiled = try!(Pattern::new(pattern));
         return Ok(Wildcard {
           pattern: compiled,
-          successor: box try!(Selector::from_components(rest)),
+          successor: Box::new(try!(Selector::from_components(rest))),
           entries: None,
         });
       }
@@ -88,7 +88,7 @@ impl Selector {
       else {
         return Ok(Precise {
           pattern: pattern.to_string(),
-          successor: box try!(Selector::from_components(rest)),
+          successor: Box::new(try!(Selector::from_components(rest))),
         });
       }
     } else {
@@ -110,7 +110,7 @@ impl Selector {
     match *self {
       Precise {
         ref pattern,
-        successor: box ref mut successor
+        successor: ref mut successor
       } => {
         let joined = path.join(pattern);
 
@@ -123,7 +123,7 @@ impl Selector {
 
       Wildcard {
         ref pattern,
-        successor: box ref mut successor,
+        successor: ref mut successor,
         ref mut entries,
       } => {
         if !path.is_dir() {
@@ -164,7 +164,7 @@ impl Selector {
 
       // TODO: currently doesn't consider cur-dir
       Recursive {
-        successor: box ref mut successor,
+        successor: ref mut successor,
         ref mut directories,
       } => {
         if !path.is_dir() {
@@ -284,7 +284,7 @@ pub fn glob(pattern: &str) -> Result<Paths, Error> {
   fn handle_volume_relative(p: Path) -> Path { p }
 
   let root = Path::new(pattern).root_path();
-  let root_len = root.as_ref().map_or(0u, |p| p.as_vec().len());
+  let root_len = root.as_ref().map_or(0us, |p| p.as_vec().len());
 
   if root.is_some() && check_windows_verbatim(root.as_ref().unwrap()) {
     panic!("FIXME: verbatim");
