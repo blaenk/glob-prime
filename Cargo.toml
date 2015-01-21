@@ -5,5 +5,10 @@ version = "0.0.1"
 authors = ["Jorge Israel Peña <jorge.israel.p@gmail.com>"]
 
 [dependencies]
+glob = "*"
 
-regex_macros = "*"
+[dependencies.regex]
+path = "../regex"
+
+[dependencies.regex_macros]
+path = "../regex/regex_macros"
